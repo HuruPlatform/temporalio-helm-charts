@@ -129,7 +129,7 @@ Here are examples of commands you can use to create and initialize the databases
 
 ```bash
 # in https://github.com/temporalio/temporal git repo dir
-export SQL_PLUGIN=mysql
+export SQL_PLUGIN=mysql8
 export SQL_HOST=mysql_host
 export SQL_PORT=3306
 export SQL_USER=mysql_user
@@ -139,11 +139,11 @@ make temporal-sql-tool
 
 ./temporal-sql-tool --database temporal create-database
 SQL_DATABASE=temporal ./temporal-sql-tool setup-schema -v 0.0
-SQL_DATABASE=temporal ./temporal-sql-tool update -schema-dir schema/mysql/v57/temporal/versioned
+SQL_DATABASE=temporal ./temporal-sql-tool update -schema-dir schema/mysql/v8/temporal/versioned
 
 ./temporal-sql-tool --database temporal_visibility create-database
 SQL_DATABASE=temporal_visibility ./temporal-sql-tool setup-schema -v 0.0
-SQL_DATABASE=temporal_visibility ./temporal-sql-tool update -schema-dir schema/mysql/v57/visibility/versioned
+SQL_DATABASE=temporal_visibility ./temporal-sql-tool update -schema-dir schema/mysql/v8/visibility/versioned
 ```
 
 Once you initialized the two databases, fill in the configuration values in `values/values.mysql.yaml`, and run
@@ -166,7 +166,7 @@ helm install -f values/values.mysql.yaml temporaltest \
   --set server.config.persistence.default.sql.host=mysql_host \
   --set server.config.persistence.visibility.sql.host=mysql_host . --timeout 900s
 ```
-*NOTE:* For MYSQL <5.7.20 (e.g AWS Aurora MySQL) use `values/values.aurora-mysql.yaml`
+*NOTE:* Requires MySQL 8.0.17+, older versions are not supported.
 
 ### Install with your own PostgreSQL
 
@@ -178,7 +178,7 @@ Here are examples of commands you can use to create and initialize the databases
 
 ```bash
 # in https://github.com/temporalio/temporal git repo dir
-export SQL_PLUGIN=postgres
+export SQL_PLUGIN=postgres12
 export SQL_HOST=postgresql_host
 export SQL_PORT=5432
 export SQL_USER=postgresql_user
@@ -188,11 +188,11 @@ make temporal-sql-tool
 
 ./temporal-sql-tool --database temporal create-database
 SQL_DATABASE=temporal ./temporal-sql-tool setup-schema -v 0.0
-SQL_DATABASE=temporal ./temporal-sql-tool update -schema-dir schema/postgresql/v96/temporal/versioned
+SQL_DATABASE=temporal ./temporal-sql-tool update -schema-dir schema/postgresql/v12/temporal/versioned
 
 ./temporal-sql-tool --database temporal_visibility create-database
 SQL_DATABASE=temporal_visibility ./temporal-sql-tool setup-schema -v 0.0
-SQL_DATABASE=temporal_visibility ./temporal-sql-tool update -schema-dir schema/postgresql/v96/visibility/versioned
+SQL_DATABASE=temporal_visibility ./temporal-sql-tool update -schema-dir schema/postgresql/v12/visibility/versioned
 ```
 
 Once you initialized the two databases, fill in the configuration values in `values/values.postgresql.yaml`, and run
@@ -216,12 +216,13 @@ helm install -f values/values.postgresql.yaml temporaltest \
   --set server.config.persistence.visibility.sql.host=postgresql_host . --timeout 900s
 ```
 
+*NOTE:* Requires PostgreSQL 12+, older versions are not supported.
+
 ### Install with your own Cassandra
 
 You might already be operating a Cassandra instance that you want to use with Temporal.
 
 In this case, create and setup keyspaces in your Cassandra instance with `temporal-cassandra-tool`. The tool is part of [temporal repo](https://github.com/temporalio/temporal), and it relies on the schema definition, in the same repo.
-
 
 Here are examples of commands you can use to create and initialize the keyspaces:
 
@@ -235,10 +236,6 @@ export CASSANDRA_PASSWORD=cassandra_user_password
 ./temporal-cassandra-tool create-Keyspace -k temporal
 CASSANDRA_KEYSPACE=temporal ./temporal-cassandra-tool setup-schema -v 0.0
 CASSANDRA_KEYSPACE=temporal ./temporal-cassandra-tool update -schema-dir schema/cassandra/temporal/versioned
-
-./temporal-cassandra-tool create-Keyspace -k temporal_visibility
-CASSANDRA_KEYSPACE=temporal_visibility ./temporal-cassandra-tool setup-schema -v 0.0
-CASSANDRA_KEYSPACE=temporal_visibility ./temporal-cassandra-tool update -schema-dir schema/cassandra/visibility/versioned
 ```
 
 Once you initialized the two keyspaces, fill in the configuration values in `values/values.cassandra.yaml`, and run
@@ -246,6 +243,8 @@ Once you initialized the two keyspaces, fill in the configuration values in `val
 ```bash
 helm install -f values/values.cassandra.yaml temporaltest . --timeout 900s
 ```
+
+Note that Temporal cannot run without setting up a store for Visibility, and Cassandra is not a supported database for Visibility. We recommend using Elasticsearch in this case (see below how to setup).
 
 ### Enable Archival
 
@@ -282,28 +281,22 @@ The example below demonstrates a few things:
 
 ```bash
 helm install temporaltest \
-   -f values/values.cassandra.yaml \
-   -f values/values.elasticsearch.yaml \
-   --set grafana.enabled=false \
-   --set prometheus.enabled=false \
-   --set server.replicaCount=5 \
-   --set server.config.persistence.default.cassandra.hosts=cassandra.data.host.example \
-   --set server.config.persistence.default.cassandra.user=cassandra_user \
-   --set server.config.persistence.default.cassandra.password=cassandra_user_password \
-   --set server.config.persistence.default.cassandra.tls.caData=$(base64 --wrap=0 cassandra.ca.pem) \
-   --set server.config.persistence.default.cassandra.tls.enabled=true \
-   --set server.config.persistence.default.cassandra.replicationFactor=3 \
-   --set server.config.persistence.default.cassandra.keyspace=temporal \
-   --set server.config.persistence.visibility.cassandra.hosts=cassandra.vis.host.example \
-   --set server.config.persistence.visibility.cassandra.user=cassandra_user_vis \
-   --set server.config.persistence.visibility.cassandra.password=cassandra_user_vis_password \
-   --set server.config.persistence.visibility.cassandra.tls.caData=$(base64 --wrap=0 cassandra.ca.pem) \
-   --set server.config.persistence.visibility.cassandra.tls.enabled=true \
-   --set server.config.persistence.visibility.cassandra.replicationFactor=3 \
-   --set server.config.persistence.visibility.cassandra.keyspace=temporal_visibility \
-   . \
-   --timeout 15m \
-   --wait
+    -f values/values.cassandra.yaml \
+    -f values/values.elasticsearch.yaml \
+    --set elasticsearch.enabled=true \
+    --set grafana.enabled=false \
+    --set prometheus.enabled=false \
+    --set server.replicaCount=5 \
+    --set server.config.persistence.default.cassandra.hosts=cassandra.data.host.example \
+    --set server.config.persistence.default.cassandra.user=cassandra_user \
+    --set server.config.persistence.default.cassandra.password=cassandra_user_password \
+    --set server.config.persistence.default.cassandra.tls.caData=$(base64 --wrap=0 cassandra.ca.pem) \
+    --set server.config.persistence.default.cassandra.tls.enabled=true \
+    --set server.config.persistence.default.cassandra.replicationFactor=3 \
+    --set server.config.persistence.default.cassandra.keyspace=temporal \
+    . \
+    --timeout 15m \
+    --wait
 ```
 
 ## Play With It
@@ -496,7 +489,7 @@ Example:
 
 ### Upgrade Schema
 
-Here are examples of commands you can use to upgrade the "default" and "visibility" schemas in your "bring your own" Cassandra database.
+Here are examples of commands you can use to upgrade the "default" schema in your "bring your own" Cassandra database.
 
 Upgrade default schema:
 
@@ -513,21 +506,6 @@ temporal_v1.2.1 $ temporal-cassandra-tool \
    --schema-dir ./schema/cassandra/temporal/versioned
 ```
 
-Upgrade visibility schema:
-
-```
-temporal_v1.2.1 $ temporal-cassandra-tool \
-   --tls \
-   --tls-ca-file ... \
-   --user cassandra-user \
-   --password cassandra-password \
-   --endpoint cassandra.example.com \
-   --keyspace temporal_visibility \
-   --timeout 120 \
-   update \
-   --schema-dir ./schema/cassandra/visibility/versioned
-```
-
 To upgrade your MySQL database, please use `temporal-sql-tool` tool instead of `temporal-cassandra-tool`.
 
 ### Upgrade Temporal Instance's Docker Images
@@ -539,6 +517,7 @@ helm \
     upgrade \
     temporaltest \
     -f values/values.cassandra.yaml \
+    -f values/values.elasticsearch.yaml \
     --set elasticsearch.enabled=true \
     --set server.replicaCount=8 \
     --set server.config.persistence.default.cassandra.hosts='{c1.example.com,c2.example.com,c3.example.com}' \
@@ -548,13 +527,6 @@ helm \
     --set server.config.persistence.default.cassandra.tls.enabled=true \
     --set server.config.persistence.default.cassandra.replicationFactor=3 \
     --set server.config.persistence.default.cassandra.keyspace=temporal \
-    --set server.config.persistence.visibility.cassandra.hosts='{c1.example.com,c2.example.com,c3.example.com}' \
-    --set server.config.persistence.visibility.cassandra.user=cassandra-user \
-    --set server.config.persistence.visibility.cassandra.password=cassandra-password \
-    --set server.config.persistence.visibility.cassandra.tls.caData=... \
-    --set server.config.persistence.visibility.cassandra.tls.enabled=true \
-    --set server.config.persistence.visibility.cassandra.replicationFactor=3 \
-    --set server.config.persistence.visibility.cassandra.keyspace=temporal_visibility \
     --set server.image.tag=1.2.1 \
     --set server.image.repository=temporalio/server \
     --set admintools.image.tag=1.2.1 \
