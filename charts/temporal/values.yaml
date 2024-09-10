@@ -379,6 +379,7 @@ schema:
   resources: {}
   containerSecurityContext: {}
   securityContext: {}
+  podAnnotations: {}
 elasticsearch:
   enabled: true
   replicas: 3

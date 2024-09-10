@@ -13,6 +13,10 @@ spec:
       labels:
         # Currently there are no labels for job type
         {{- include "temporal.resourceLabels" (list . "database" "") | nindent 8 }}
+      annotations:
+        {{- with .Values.schema.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+          {{- end }}
     spec:
       {{ include "temporal.serviceAccount" . }}
       restartPolicy: OnFailure
